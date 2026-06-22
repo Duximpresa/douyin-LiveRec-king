@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "douyin-LiveRec-king"
+version = "0.2.1"
+description = "Windows desktop live-stream monitor and FFmpeg recorder."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "douyin-LiveRec-king contributors" }]
+dependencies = [
+  "PySide6>=6.7,<7",
+  "requests>=2.32,<3",
+  "streamget==4.0.10",
+  "socksio>=1.0.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2,<9",
+  "pyinstaller>=6.8,<7",
+]
+
+[project.gui-scripts]
+douyin-live-rec-king = "douyin_live_rec_king.app:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
