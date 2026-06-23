@@ -52,6 +52,18 @@ def test_live_room_uses_web_route(monkeypatch) -> None:
     assert status.stream_url.endswith(".m3u8")
 
 
+def test_follow_live_url_is_normalized_to_web_room(monkeypatch) -> None:
+    install_fake_streamget(monkeypatch)
+    extractor = DouyinExtractor()
+    url = "https://www.douyin.com/follow/live/713112138925?from=follow"
+
+    assert extractor.normalize_url(url) == "https://live.douyin.com/713112138925"
+
+    status = extractor.check_live_status(url)
+    assert FakeDouyinLiveStream.calls == ["web"]
+    assert status.canonical_url == "https://live.douyin.com/123"
+
+
 def test_profile_and_short_link_use_app_route(monkeypatch) -> None:
     install_fake_streamget(monkeypatch)
     extractor = DouyinExtractor(stream_source=StreamSource.FLV)
@@ -66,4 +78,3 @@ def test_mock_and_invalid_url() -> None:
     assert not DouyinExtractor().check_live_status("mock://offline").is_live
     status = DouyinExtractor().check_live_status("https://example.com/room")
     assert status.error and "douyin.com" in status.error
-

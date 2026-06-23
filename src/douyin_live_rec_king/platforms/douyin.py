@@ -35,6 +35,14 @@ class DouyinExtractor(BasePlatformExtractor):
             raise ValueError("请输入抖音直播间、作者主页或分享短链")
         if not any(host in parsed.netloc.lower() for host in ("douyin.com", "iesdouyin.com")):
             raise ValueError("当前仅支持 douyin.com 或 iesdouyin.com 地址")
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if (
+            parsed.netloc.lower() in {"douyin.com", "www.douyin.com"}
+            and len(path_parts) == 3
+            and path_parts[:2] == ["follow", "live"]
+            and path_parts[2].isdigit()
+        ):
+            return f"https://live.douyin.com/{path_parts[2]}"
         return value
 
     @staticmethod

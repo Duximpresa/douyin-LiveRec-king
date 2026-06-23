@@ -63,6 +63,6 @@ class TaskDialog(QDialog):
         return {
             "anchor_name": self.anchor_edit.text().strip(),
             "url": self.url_edit.text().strip(),
-            "platform": self.platform_combo.currentData(),
+            "platform": PlatformType(self.platform_combo.currentData()),
             "enabled": self.enabled_check.isChecked(),
         }
