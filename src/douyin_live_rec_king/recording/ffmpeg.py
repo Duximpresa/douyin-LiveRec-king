@@ -71,6 +71,11 @@ class FFmpegTool:
         proxy: str | None = None,
         segmented: bool = False,
         segment_seconds: int = 1800,
+        headers: dict[str, str] | None = None,
+        user_agent: str | None = None,
+        referer: str | None = None,
+        cookie: str | None = None,
+        reconnect: bool = True,
     ) -> list[str]:
         command = [
             self.resolved_executable(),
@@ -81,10 +86,38 @@ class FFmpegTool:
             "-rw_timeout",
             "15000000",
         ]
+        if reconnect:
+            command += [
+                "-reconnect",
+                "1",
+                "-reconnect_streamed",
+                "1",
+                "-reconnect_delay_max",
+                "5",
+            ]
         if proxy:
             command += ["-http_proxy", proxy]
+        normalized_headers = {
+            str(key).strip().lower(): (str(key).strip(), str(value).strip())
+            for key, value in (headers or {}).items()
+            if str(key).strip() and str(value).strip()
+        }
+        if referer:
+            normalized_headers["referer"] = ("Referer", referer.strip())
+        if cookie:
+            normalized_headers["cookie"] = ("Cookie", cookie.strip())
+        if user_agent:
+            normalized_headers.pop("user-agent", None)
+            command += ["-user_agent", user_agent.strip()]
+        if normalized_headers:
+            header_block = "".join(
+                f"{name}: {value}\r\n" for name, value in normalized_headers.values()
+            )
+            command += ["-headers", header_block]
         command += ["-i", stream_url, "-map", "0", "-c", "copy"]
         if segmented:
+            if "%" not in output.name:
+                output = output.with_name(f"{output.stem}_%03d{output.suffix}")
             command += [
                 "-f",
                 "segment",
@@ -97,6 +130,8 @@ class FFmpegTool:
         return command
 
     def convert_to_mp4(self, source: Path, delete_original: bool = False) -> Path:
+        if not source.exists() or source.stat().st_size <= 0:
+            raise ValueError(f"源文件不存在或为空: {source}")
         target = source.with_suffix(".mp4")
         subprocess.run(
             [
@@ -116,6 +151,8 @@ class FFmpegTool:
             check=True,
             timeout=3600,
         )
+        if not target.exists() or target.stat().st_size <= 0:
+            raise RuntimeError(f"转换后的 MP4 不存在或为空: {target}")
         if delete_original and source.exists() and source != target:
             source.unlink()
         return target

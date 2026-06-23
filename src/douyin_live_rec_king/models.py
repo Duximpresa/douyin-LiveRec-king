@@ -11,12 +11,17 @@ from uuid import uuid4
 
 class PlatformType(StrEnum):
     DOUYIN = "douyin"
+    BILIBILI = "bilibili"
 
 
 class TaskStatus(StrEnum):
     IDLE = "未开播"
+    MONITORING = "监控中"
     CHECKING = "检测中"
+    LIVE_DETECTED = "已开播"
+    STARTING_RECORD = "启动录制中"
     RECORDING = "录制中"
+    STOPPING = "停止中"
     ERROR = "错误"
     DISABLED = "已禁用"
 
@@ -39,6 +44,19 @@ class VideoQuality(StrEnum):
     LD = "LD"
 
 
+class RecordingExitReason(StrEnum):
+    COMPLETED = "completed"
+    MANUAL_STOP = "manual_stop"
+    LIVE_ENDED = "live_ended"
+    NETWORK_ERROR = "network_error"
+    PARSER_ERROR = "parser_error"
+    AUTH_ERROR = "auth_error"
+    STORAGE_ERROR = "storage_error"
+    FFMPEG_ERROR = "ffmpeg_error"
+    CONVERSION_ERROR = "conversion_error"
+    INTERRUPTED = "interrupted"
+
+
 @dataclass(slots=True)
 class LiveStatus:
     is_live: bool
@@ -52,6 +70,10 @@ class LiveStatus:
     raw: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     parser_error: str | None = None
+    headers: dict[str, str] = field(default_factory=dict)
+    user_agent: str | None = None
+    referer: str | None = None
+    cookie: str | None = None
 
 
 @dataclass(slots=True)
@@ -68,6 +90,8 @@ class LiveTask:
     recording_file: str | None = None
     last_checked_at: str | None = None
     last_error: str | None = None
+    retry_count: int = 0
+    next_retry_at: str | None = None
 
     @property
     def display_name(self) -> str:
@@ -96,14 +120,47 @@ class LiveTask:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "LiveTask":
         payload = dict(data)
-        payload["platform"] = PlatformType(payload.get("platform", "douyin"))
-        payload["status"] = TaskStatus(payload.get("status", TaskStatus.IDLE.value))
+        platform_value = payload.get("platform", PlatformType.DOUYIN.value)
+        try:
+            payload["platform"] = PlatformType(platform_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"不支持的平台: {platform_value}") from exc
+        payload["status"] = cls._parse_status(payload.get("status"))
         source = payload.get("nickname_source")
         if source is None:
             source = "custom" if payload.get("anchor_name") else "auto"
         payload["nickname_source"] = NicknameSource(source)
         allowed = cls.__dataclass_fields__.keys()
         return cls(**{key: value for key, value in payload.items() if key in allowed})
+
+    @staticmethod
+    def _parse_status(value: object) -> TaskStatus:
+        if isinstance(value, TaskStatus):
+            return value
+        if value is None:
+            return TaskStatus.IDLE
+        text = str(value).strip()
+        legacy = {
+            "空闲": TaskStatus.IDLE,
+            "未开播": TaskStatus.IDLE,
+            "监控中": TaskStatus.MONITORING,
+            "检测中": TaskStatus.CHECKING,
+            "已开播": TaskStatus.LIVE_DETECTED,
+            "启动录制中": TaskStatus.STARTING_RECORD,
+            "录制中": TaskStatus.RECORDING,
+            "停止中": TaskStatus.STOPPING,
+            "错误": TaskStatus.ERROR,
+            "已禁用": TaskStatus.DISABLED,
+        }
+        if text in legacy:
+            return legacy[text]
+        try:
+            return TaskStatus[text.upper()]
+        except (KeyError, AttributeError):
+            try:
+                return TaskStatus(text)
+            except ValueError:
+                return TaskStatus.IDLE
 
     def mark_checked(self) -> None:
         self.last_checked_at = datetime.now().astimezone().isoformat(timespec="seconds")
@@ -128,11 +185,24 @@ class AppSettings:
     proxy_enabled: bool = False
     proxy_address: str = ""
     douyin_cookie: str = ""
+    bilibili_cookie: str = ""
     ffmpeg_path: str = ""
     log_level: str = "INFO"
     task_view: str = "table"
+    retry_max_attempts: int = 3
+    retry_delays_seconds: str = "5,15,45"
+    max_concurrent_retries: int = 2
 
     @property
     def proxy(self) -> str | None:
         return self.proxy_address.strip() if self.proxy_enabled else None
 
+    @property
+    def retry_delays(self) -> tuple[int, ...]:
+        values: list[int] = []
+        for item in self.retry_delays_seconds.split(","):
+            try:
+                values.append(max(1, int(item.strip())))
+            except ValueError:
+                continue
+        return tuple(values) or (5, 15, 45)

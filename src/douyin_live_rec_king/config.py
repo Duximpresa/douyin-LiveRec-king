@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .models import AppSettings, LiveTask, StreamSource, VideoQuality
 from .utils.paths import resolve_app_path
+from .utils.json_recovery import atomic_write_json, load_json_with_recovery
 
 
 class SettingsStore:
@@ -47,9 +48,26 @@ class SettingsStore:
                 proxy_enabled=section.get("proxy_enabled", str(defaults.proxy_enabled)).lower() == "true",
                 proxy_address=section.get("proxy_address", defaults.proxy_address),
                 douyin_cookie=section.get("douyin_cookie", defaults.douyin_cookie),
+                bilibili_cookie=section.get("bilibili_cookie", defaults.bilibili_cookie),
                 ffmpeg_path=section.get("ffmpeg_path", defaults.ffmpeg_path),
                 log_level=section.get("log_level", defaults.log_level).upper(),
                 task_view=section.get("task_view", defaults.task_view),
+                retry_max_attempts=max(
+                    0,
+                    int(section.get("retry_max_attempts", defaults.retry_max_attempts)),
+                ),
+                retry_delays_seconds=section.get(
+                    "retry_delays_seconds", defaults.retry_delays_seconds
+                ),
+                max_concurrent_retries=max(
+                    1,
+                    int(
+                        section.get(
+                            "max_concurrent_retries",
+                            defaults.max_concurrent_retries,
+                        )
+                    ),
+                ),
             )
 
     def save(self, settings: AppSettings) -> None:
@@ -81,21 +99,18 @@ class TaskStore:
                 self.save([])
                 return []
             try:
-                payload = json.loads(self.path.read_text(encoding="utf-8"))
+                payload, _recovered_from = load_json_with_recovery(self.path)
                 rows = payload.get("tasks", payload) if isinstance(payload, dict) else payload
                 return [LiveTask.from_dict(item) for item in rows]
-            except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            except (OSError, json.JSONDecodeError, TypeError, ValueError, RuntimeError) as exc:
                 raise RuntimeError(f"无法读取任务文件 {self.path}: {exc}") from exc
 
     def save(self, tasks: list[LiveTask]) -> None:
+        self.save_snapshot([task.to_dict() for task in tasks])
+
+    def save_snapshot(self, tasks: list[dict[str, object]]) -> None:
         with self._lock:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self.path.with_suffix(".json.tmp")
-            temporary.write_text(
-                json.dumps({"version": 2, "tasks": [task.to_dict() for task in tasks]}, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            temporary.replace(self.path)
+            atomic_write_json(self.path, {"version": 2, "tasks": tasks})
 
 
 def migrate_legacy_config(

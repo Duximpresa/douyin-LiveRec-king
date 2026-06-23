@@ -1,4 +1,10 @@
-from .recorder import Recorder
+from .events import RecordingEvent, RecordingEventType
+from .recorder import Recorder, RecorderExitResult, StopAllResult
 
-__all__ = ["Recorder"]
-
+__all__ = [
+    "Recorder",
+    "RecorderExitResult",
+    "RecordingEvent",
+    "RecordingEventType",
+    "StopAllResult",
+]

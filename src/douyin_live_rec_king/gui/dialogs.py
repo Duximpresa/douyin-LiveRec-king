@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..models import LiveTask, PlatformType
+from ..platforms.registry import platform_metadata, registered_platforms
 
 
 class TaskDialog(QDialog):
@@ -24,17 +25,20 @@ class TaskDialog(QDialog):
         self.anchor_edit = QLineEdit(task.anchor_name if task else "")
         self.anchor_edit.setPlaceholderText("选填；留空后将从抖音自动获取")
         self.url_edit = QLineEdit(task.url if task else "")
-        self.url_edit.setPlaceholderText(
-            "直播间、作者主页、v.douyin.com 分享短链或 mock://offline"
-        )
         self.platform_combo = QComboBox()
-        self.platform_combo.addItem("抖音", PlatformType.DOUYIN)
+        for metadata in registered_platforms():
+            self.platform_combo.addItem(metadata.display_name, metadata.type)
+        selected_platform = task.platform if task else PlatformType.DOUYIN
+        selected_index = self.platform_combo.findData(selected_platform)
+        self.platform_combo.setCurrentIndex(max(0, selected_index))
+        self.platform_combo.currentIndexChanged.connect(self._platform_changed)
         self.enabled_check = QCheckBox("启用此任务")
         self.enabled_check.setChecked(task.enabled if task else True)
 
         form = QFormLayout()
         form.addRow("主播昵称：", self.anchor_edit)
-        form.addRow("抖音地址：", self.url_edit)
+        self.url_label = QLabel()
+        form.addRow(self.url_label, self.url_edit)
         form.addRow("平台：", self.platform_combo)
         form.addRow("", self.enabled_check)
         hint = QLabel(
@@ -52,6 +56,13 @@ class TaskDialog(QDialog):
         layout.addLayout(form)
         layout.addWidget(hint)
         layout.addWidget(buttons)
+        self._platform_changed()
+
+    def _platform_changed(self, *_args) -> None:
+        platform = PlatformType(self.platform_combo.currentData())
+        metadata = platform_metadata(platform)
+        self.url_label.setText(f"{metadata.display_name} 地址：")
+        self.url_edit.setPlaceholderText(metadata.url_placeholder)
 
     def _validate(self) -> None:
         if not self.url_edit.text().strip():

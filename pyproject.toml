@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "douyin-LiveRec-king"
-version = "0.2.1"
+version = "0.3.0"
 description = "Windows desktop live-stream monitor and FFmpeg recorder."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,3 +35,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+  "ffmpeg_integration: short local FFmpeg/ffprobe integration tests",
+  "stress: fast deterministic concurrency tests",
+]

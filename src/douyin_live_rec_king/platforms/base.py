@@ -3,8 +3,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
-from ..models import LiveStatus
+from ..models import LiveStatus, PlatformType
+
+
+@dataclass(frozen=True, slots=True)
+class PlatformMetadata:
+    type: PlatformType
+    display_name: str
+    url_placeholder: str
+    cookie_setting: str
 
 
 class BasePlatformExtractor(ABC):
@@ -19,4 +28,3 @@ class BasePlatformExtractor(ABC):
     @abstractmethod
     def get_stream_url(self, url: str) -> str | None:
         """Return a playable stream URL when live, otherwise None."""
-

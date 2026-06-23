@@ -31,10 +31,20 @@ if exist "runtime\ffmpeg\bin\ffmpeg.exe" (
   xcopy /E /I /Y "runtime\ffmpeg" "dist\douyin-LiveRec-king\runtime\ffmpeg" >nul
 )
 
+if not exist "dist\douyin-LiveRec-king\runtime\ffmpeg\bin" mkdir "dist\douyin-LiveRec-king\runtime\ffmpeg\bin"
+if not exist "dist\douyin-LiveRec-king\runtime\ffmpeg\bin\ffprobe.exe" (
+  for /f "delims=" %%I in ('where ffprobe 2^>nul') do (
+    copy /Y "%%I" "dist\douyin-LiveRec-king\runtime\ffmpeg\bin\ffprobe.exe" >nul
+    goto ffprobe_ready
+  )
+)
+:ffprobe_ready
+
 if not exist "dist\douyin-LiveRec-king\config" mkdir "dist\douyin-LiveRec-king\config"
 copy /Y "config\config.example.ini" "dist\douyin-LiveRec-king\config\config.example.ini" >nul
-copy /Y "启动程序.bat" "dist\douyin-LiveRec-king\启动程序.bat" >nul
+copy /Y "run_windows.bat" "dist\douyin-LiveRec-king\run_windows.bat" >nul
 
 echo.
 echo Build complete: dist\douyin-LiveRec-king\douyin-LiveRec-king.exe
 endlocal
+exit /b 0

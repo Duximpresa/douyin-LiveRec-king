@@ -8,6 +8,7 @@ __pycache__/
 venv/
 build/
 dist/
+release/
 *.spec
 .idea/
 .vscode/
@@ -18,6 +19,8 @@ data/config.json
 data/config.json.tmp
 data/tasks.json
 data/tasks.json.tmp
+data/recording_history.json
+data/recording_history.json.tmp
 config/config.ini
 runtime/ffmpeg/
 runtime/node/

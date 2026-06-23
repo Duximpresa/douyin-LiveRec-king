@@ -8,6 +8,7 @@ from douyin_live_rec_king.models import (
     NicknameSource,
     StreamSource,
     VideoQuality,
+    TaskStatus,
 )
 
 
@@ -55,3 +56,10 @@ def test_legacy_migration(tmp_path: Path) -> None:
     assert migrate_legacy_config(legacy, settings_store, task_store)
     assert settings_store.load().default_format == "mp4"
     assert task_store.load()[0].display_name == "旧主播"
+
+
+def test_task_status_compatibility() -> None:
+    assert LiveTask.from_dict({"url": "mock://offline", "status": "录制中"}).status is TaskStatus.RECORDING
+    assert LiveTask.from_dict({"url": "mock://offline", "status": "STOPPING"}).status is TaskStatus.STOPPING
+    assert LiveTask.from_dict({"url": "mock://offline", "status": "future_status"}).status is TaskStatus.IDLE
+    assert LiveTask.from_dict({"url": "mock://offline", "extra": "ignored"}).status is TaskStatus.IDLE

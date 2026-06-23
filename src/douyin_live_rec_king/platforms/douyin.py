@@ -12,6 +12,10 @@ from .base import BasePlatformExtractor
 
 
 class DouyinExtractor(BasePlatformExtractor):
+    USER_AGENT = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 Chrome/124 Safari/537.36"
+    )
     def __init__(
         self,
         timeout: float = 15.0,
@@ -25,6 +29,14 @@ class DouyinExtractor(BasePlatformExtractor):
         self.proxy = proxy
         self.quality = quality
         self.stream_source = stream_source
+
+    def _request_fields(self, canonical_url: str | None) -> dict[str, object]:
+        return {
+            "headers": {},
+            "user_agent": self.USER_AGENT,
+            "referer": canonical_url or "https://live.douyin.com/",
+            "cookie": self.cookie or None,
+        }
 
     def normalize_url(self, url: str) -> str:
         value = url.strip()
@@ -68,6 +80,7 @@ class DouyinExtractor(BasePlatformExtractor):
             flv = getattr(stream, "flv_url", None)
             selected = hls if self.stream_source is StreamSource.HLS else flv
             selected = selected or getattr(stream, "record_url", None) or hls or flv
+            canonical = getattr(stream, "live_url", None)
             return LiveStatus(
                 is_live=bool(getattr(stream, "is_live", False)),
                 title=getattr(stream, "title", None),
@@ -75,9 +88,10 @@ class DouyinExtractor(BasePlatformExtractor):
                 stream_url=selected,
                 hls_url=hls,
                 flv_url=flv,
-                canonical_url=getattr(stream, "live_url", None),
+                canonical_url=canonical,
                 quality=getattr(stream, "quality", None) or self.quality.value,
                 raw=raw_data if isinstance(raw_data, dict) else {},
+                **self._request_fields(canonical),
             )
         except Exception as exc:
             message = str(exc)
@@ -110,6 +124,7 @@ class DouyinExtractor(BasePlatformExtractor):
                     quality=self.quality.value,
                     raw={"mode": "mock"},
                     error=None if stream_url else "mock://live 需要 ?url= 测试流地址",
+                    **self._request_fields(normalized),
                 )
             if normalized.startswith("stream://"):
                 stream_url = normalized.removeprefix("stream://")
@@ -122,6 +137,7 @@ class DouyinExtractor(BasePlatformExtractor):
                     canonical_url=normalized,
                     quality=self.quality.value,
                     raw={"mode": "direct"},
+                    **self._request_fields(normalized),
                 )
             return asyncio.run(self._fetch(normalized))
         except (ValueError, requests.RequestException) as exc:
